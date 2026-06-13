@@ -1,4 +1,6 @@
+import { useRef } from 'react'
 import { useGameStore, type Cell } from './store/gameStore'
+import { ParticleCanvas, emitBurst, emitCelebration } from './ParticleCanvas'
 import './App.css'
 
 function CellButton({
@@ -6,18 +8,36 @@ function CellButton({
   value,
   isWin,
   disabled,
+  current,
   onMove,
 }: {
   index: number
   value: Cell
   isWin: boolean
   disabled: boolean
+  current: 'X' | 'O'
   onMove: (i: number) => void
 }) {
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  function handleClick() {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      emitBurst({
+        x: r.left + r.width / 2,
+        y: r.top + r.height / 2,
+        color: current === 'X' ? '#a78bfa' : '#60a5fa',
+        count: 24,
+      })
+    }
+    onMove(index)
+  }
+
   return (
     <button
+      ref={btnRef}
       className={`cell ${value ?? ''} ${isWin ? 'win' : ''}`}
-      onClick={() => onMove(index)}
+      onClick={handleClick}
       disabled={disabled}
       aria-label={`Cell ${index + 1}${value ? `, ${value}` : ''}`}
     >
@@ -29,6 +49,18 @@ function CellButton({
 export default function App() {
   const { board, current, winner, winLine, scores, reset, resetScores, mode, setMode, aiThinking, move, theme, toggleTheme } =
     useGameStore()
+
+  const boardRef = useRef<HTMLDivElement>(null)
+  const prevWinner = useRef<string | null>(null)
+
+  if (winner && winner !== 'draw' && prevWinner.current !== winner) {
+    prevWinner.current = winner
+    if (boardRef.current) {
+      const r = boardRef.current.getBoundingClientRect()
+      emitCelebration(r.left + r.width / 2, r.top + r.height / 2)
+    }
+  }
+  if (!winner) prevWinner.current = null
 
   const winSet = new Set(winLine ?? [])
   const cellDisabled = !!winner || aiThinking
@@ -47,6 +79,8 @@ export default function App() {
       : `Player ${current}'s Turn`
 
   return (
+    <>
+    <ParticleCanvas />
     <div className="app">
       <div className="top-bar">
         <h1 className="title">Tic Tac Toe</h1>
@@ -92,7 +126,7 @@ export default function App() {
         {statusText}
       </p>
 
-      <div className={`board ${aiThinking ? 'board-disabled' : ''}`}>
+      <div ref={boardRef} className={`board ${aiThinking ? 'board-disabled' : ''}`}>
         {board.map((cell, i) => (
           <CellButton
             key={i}
@@ -100,6 +134,7 @@ export default function App() {
             value={cell}
             isWin={winSet.has(i)}
             disabled={cellDisabled || !!cell}
+            current={current}
             onMove={move}
           />
         ))}
@@ -110,5 +145,6 @@ export default function App() {
         <button className="btn ghost" onClick={resetScores}>Reset Scores</button>
       </div>
     </div>
+    </>
   )
 }
