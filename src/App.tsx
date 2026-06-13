@@ -2,16 +2,29 @@ import { useEffect, useState } from 'react'
 import { useGameStore, getWinningCells, type Cell } from './store/gameStore'
 import './App.css'
 
-function CellButton({ index, value }: { index: number; value: Cell }) {
-  const { move, winner, board, aiThinking } = useGameStore()
-  const winCells = getWinningCells(board)
-  const isWin = winCells.includes(index)
-  const disabled = !!winner || !!value || aiThinking
+function getInitialTheme(): 'dark' | 'light' {
+  const saved = localStorage.getItem('theme') as 'dark' | 'light' | null
+  if (saved) return saved
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+}
 
+function CellButton({
+  index,
+  value,
+  isWin,
+  disabled,
+  onMove,
+}: {
+  index: number
+  value: Cell
+  isWin: boolean
+  disabled: boolean
+  onMove: (i: number) => void
+}) {
   return (
     <button
       className={`cell ${value ?? ''} ${isWin ? 'win' : ''}`}
-      onClick={() => move(index)}
+      onClick={() => onMove(index)}
       disabled={disabled}
       aria-label={`Cell ${index + 1}${value ? `, ${value}` : ''}`}
     >
@@ -21,16 +34,21 @@ function CellButton({ index, value }: { index: number; value: Cell }) {
 }
 
 export default function App() {
-  const { board, current, winner, scores, reset, resetScores, mode, setMode, aiThinking } = useGameStore()
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const { board, current, winner, scores, reset, resetScores, mode, setMode, aiThinking, move } =
+    useGameStore()
+  const [theme, setTheme] = useState<'dark' | 'light'>(getInitialTheme)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
   }, [theme])
 
-  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
+  const toggleTheme = () => setTheme(t => (t === 'dark' ? 'light' : 'dark'))
 
-  const statusText = () => {
+  const winCells = getWinningCells(board)
+  const cellDisabled = !!winner || aiThinking
+
+  const getStatusText = () => {
     if (winner) {
       if (winner === 'draw') return "It's a Draw!"
       if (mode === 'pvc') return winner === 'X' ? 'You Win! 🎉' : 'AI Wins! 🤖'
@@ -70,8 +88,13 @@ export default function App() {
           <span className="score-sub">{mode === 'pvc' ? 'You' : 'Player 1'}</span>
           <span className="score-value">{scores.X}</span>
         </div>
-        <div className="score-divider">VS</div>
-        <div className={`score-card ${current === 'O' && !winner ? 'active' : ''}`}>
+        <div className="score-divider-col">
+          <span className="score-divider">VS</span>
+          {scores.draw > 0 && (
+            <span className="score-draw" title="Draws">{scores.draw} draw{scores.draw !== 1 ? 's' : ''}</span>
+          )}
+        </div>
+        <div className={`score-card ${current === 'O' && !winner && !aiThinking ? 'active' : ''}`}>
           <span className="player-label o">O</span>
           <span className="score-sub">{mode === 'pvc' ? 'AI' : 'Player 2'}</span>
           <span className="score-value">{scores.O}</span>
@@ -79,12 +102,19 @@ export default function App() {
       </div>
 
       <p className={`status ${winner ? 'winner' : ''} ${aiThinking ? 'thinking' : ''}`}>
-        {statusText()}
+        {getStatusText()}
       </p>
 
       <div className={`board ${aiThinking ? 'board-disabled' : ''}`}>
         {board.map((cell, i) => (
-          <CellButton key={i} index={i} value={cell} />
+          <CellButton
+            key={i}
+            index={i}
+            value={cell}
+            isWin={winCells.includes(i)}
+            disabled={cellDisabled || !!cell}
+            onMove={move}
+          />
         ))}
       </div>
 

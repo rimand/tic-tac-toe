@@ -29,11 +29,12 @@ export function getWinningCells(board: Board): number[] {
   return []
 }
 
-// Minimax — AI is always 'O', human is 'X'
-function minimax(board: Board, isMaximizing: boolean): number {
+// Minimax with depth penalty so AI prefers faster wins.
+// Mutates board in-place for backtracking (intentional — avoids allocations on a hot 9-cell loop).
+function minimax(board: Board, isMaximizing: boolean, depth: number): number {
   const result = checkWinner(board)
-  if (result === 'O') return 10
-  if (result === 'X') return -10
+  if (result === 'O') return 10 - depth
+  if (result === 'X') return -10 + depth
   if (result === 'draw') return 0
 
   if (isMaximizing) {
@@ -41,7 +42,7 @@ function minimax(board: Board, isMaximizing: boolean): number {
     for (let i = 0; i < 9; i++) {
       if (!board[i]) {
         board[i] = 'O'
-        best = Math.max(best, minimax(board, false))
+        best = Math.max(best, minimax(board, false, depth + 1))
         board[i] = null
       }
     }
@@ -51,7 +52,7 @@ function minimax(board: Board, isMaximizing: boolean): number {
     for (let i = 0; i < 9; i++) {
       if (!board[i]) {
         board[i] = 'X'
-        best = Math.min(best, minimax(board, true))
+        best = Math.min(best, minimax(board, true, depth + 1))
         board[i] = null
       }
     }
@@ -65,7 +66,7 @@ function bestMove(board: Board): number {
   for (let i = 0; i < 9; i++) {
     if (!board[i]) {
       board[i] = 'O'
-      const val = minimax(board, false)
+      const val = minimax(board, false, 0)
       board[i] = null
       if (val > bestVal) { bestVal = val; move = i }
     }
@@ -77,9 +78,10 @@ type GameState = {
   board: Board
   current: Player
   winner: Player | 'draw' | null
-  scores: Record<Player, number>
+  scores: { X: number; O: number; draw: number }
   mode: Mode
   aiThinking: boolean
+  aiTimer: ReturnType<typeof setTimeout> | null
 }
 
 type GameActions = {
@@ -91,13 +93,19 @@ type GameActions = {
 
 const emptyBoard = (): Board => Array(9).fill(null)
 
+function cancelTimer(get: () => GameState & GameActions) {
+  const { aiTimer } = get()
+  if (aiTimer) clearTimeout(aiTimer)
+}
+
 export const useGameStore = create<GameState & GameActions>((set, get) => ({
   board: emptyBoard(),
   current: 'X',
   winner: null,
-  scores: { X: 0, O: 0 },
+  scores: { X: 0, O: 0, draw: 0 },
   mode: 'pvc',
   aiThinking: false,
+  aiTimer: null,
 
   move(index) {
     const state = get()
@@ -107,39 +115,42 @@ export const useGameStore = create<GameState & GameActions>((set, get) => ({
     board[index] = state.current
     const winner = checkWinner(board)
     const scores = { ...state.scores }
-    if (winner && winner !== 'draw') scores[winner]++
+    if (winner === 'draw') scores.draw++
+    else if (winner) scores[winner]++
 
     const next: Player = state.current === 'X' ? 'O' : 'X'
+    set({ board, current: next, winner, scores, aiTimer: null })
 
-    set({ board, current: next, winner, scores })
-
-    // Trigger AI move after short delay
     if (!winner && state.mode === 'pvc' && next === 'O') {
-      set({ aiThinking: true })
-      setTimeout(() => {
+      const timerId = setTimeout(() => {
         const s = get()
-        if (s.winner) { set({ aiThinking: false }); return }
+        if (s.winner) { set({ aiThinking: false, aiTimer: null }); return }
         const ai = bestMove([...s.board])
-        if (ai === -1) { set({ aiThinking: false }); return }
+        if (ai === -1) { set({ aiThinking: false, aiTimer: null }); return }
         const newBoard = [...s.board]
         newBoard[ai] = 'O'
         const newWinner = checkWinner(newBoard)
         const newScores = { ...s.scores }
-        if (newWinner && newWinner !== 'draw') newScores[newWinner]++
-        set({ board: newBoard, current: 'X', winner: newWinner, scores: newScores, aiThinking: false })
+        if (newWinner === 'draw') newScores.draw++
+        else if (newWinner) newScores[newWinner]++
+        set({ board: newBoard, current: 'X', winner: newWinner, scores: newScores, aiThinking: false, aiTimer: null })
       }, 400)
+      set({ aiThinking: true, aiTimer: timerId })
     }
   },
 
   reset() {
-    set((s) => ({ board: emptyBoard(), current: 'X', winner: null, aiThinking: false, scores: s.scores }))
+    cancelTimer(get)
+    set((s) => ({ board: emptyBoard(), current: 'X', winner: null, aiThinking: false, aiTimer: null, scores: s.scores }))
   },
 
   resetScores() {
-    set({ board: emptyBoard(), current: 'X', winner: null, aiThinking: false, scores: { X: 0, O: 0 } })
+    cancelTimer(get)
+    set({ board: emptyBoard(), current: 'X', winner: null, aiThinking: false, aiTimer: null, scores: { X: 0, O: 0, draw: 0 } })
   },
 
   setMode(mode) {
-    set({ mode, board: emptyBoard(), current: 'X', winner: null, aiThinking: false })
+    cancelTimer(get)
+    set({ mode, board: emptyBoard(), current: 'X', winner: null, aiThinking: false, aiTimer: null })
   },
 }))

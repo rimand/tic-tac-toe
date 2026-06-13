@@ -187,11 +187,25 @@ body {
   color: var(--text);
 }
 
+.score-divider-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
 .score-divider {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-dim);
   letter-spacing: 1px;
+}
+
+.score-draw {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap;
 }
 
 /* ── Status ── */
