@@ -1,6 +1,7 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
 import { useGameStore, type Cell } from './store/gameStore'
-import { ParticleCanvas, emitBurst, emitCelebration } from './ParticleCanvas'
+import ParticleCanvas from './ParticleCanvas'
+import { emitBurst, emitCelebration } from './particles'
 import './App.css'
 
 function CellButton({
@@ -51,16 +52,13 @@ export default function App() {
     useGameStore()
 
   const boardRef = useRef<HTMLDivElement>(null)
-  const prevWinner = useRef<string | null>(null)
 
-  if (winner && winner !== 'draw' && prevWinner.current !== winner) {
-    prevWinner.current = winner
-    if (boardRef.current) {
+  useEffect(() => {
+    if (winner && winner !== 'draw' && boardRef.current) {
       const r = boardRef.current.getBoundingClientRect()
       emitCelebration(r.left + r.width / 2, r.top + r.height / 2)
     }
-  }
-  if (!winner) prevWinner.current = null
+  }, [winner])
 
   const winSet = new Set(winLine ?? [])
   const cellDisabled = !!winner || aiThinking

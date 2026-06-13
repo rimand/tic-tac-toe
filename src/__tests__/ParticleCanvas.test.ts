@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { emitBurst, emitCelebration } from '../ParticleCanvas'
+import { emitBurst, emitCelebration } from '../particles'
 
 afterEach(() => {
   vi.restoreAllMocks()
