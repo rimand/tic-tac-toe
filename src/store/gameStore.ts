@@ -13,7 +13,7 @@ const WINNING_LINES = [
 ]
 
 // Single scan: returns the winning line or null. Used by both winner checks and UI highlighting.
-function findWinningLine(board: Board): number[] | null {
+export function findWinningLine(board: Board): number[] | null {
   for (const line of WINNING_LINES) {
     const [a, b, c] = line
     if (board[a] && board[a] === board[b] && board[a] === board[c]) return line
@@ -21,7 +21,7 @@ function findWinningLine(board: Board): number[] | null {
   return null
 }
 
-function checkWinner(board: Board): Player | 'draw' | null {
+export function checkWinner(board: Board): Player | 'draw' | null {
   const line = findWinningLine(board)
   if (line) return board[line[0]] as Player
   if (board.every(Boolean)) return 'draw'
@@ -30,7 +30,7 @@ function checkWinner(board: Board): Player | 'draw' | null {
 
 // Minimax with depth penalty so AI prefers faster wins.
 // Mutates board in-place for backtracking (intentional — avoids allocations on a hot 9-cell loop).
-function minimax(board: Board, isMaximizing: boolean, depth: number): number {
+export function minimax(board: Board, isMaximizing: boolean, depth: number): number {
   const result = checkWinner(board)
   if (result === 'O') return 10 - depth
   if (result === 'X') return -10 + depth
@@ -59,7 +59,7 @@ function minimax(board: Board, isMaximizing: boolean, depth: number): number {
   }
 }
 
-function bestMove(board: Board): number {
+export function bestMove(board: Board): number {
   let bestVal = -Infinity
   let move = -1
   for (let i = 0; i < 9; i++) {
